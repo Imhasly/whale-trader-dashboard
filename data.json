@@ -1,0 +1,14 @@
+{
+  "updated_at": 0,
+  "market_is_open": false,
+  "next_open": null,
+  "next_close": null,
+  "api_calls_today": 0,
+  "equity": 0,
+  "day_pnl": 0,
+  "day_pct": "0",
+  "max_positions": 12,
+  "positions": [],
+  "trades": [],
+  "signals": []
+}

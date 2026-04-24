@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Whale Tracker">
+<title>Whale Tracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐋%3C/text%3E%3C/svg%3E">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0e17;
+    color: #e2e8f0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  body.locked { display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .lock-card {
+    background: #1a1f36; border: 1px solid #2d3748; border-radius: 16px;
+    padding: 32px 24px; max-width: 360px; width: 100%; text-align: center;
+  }
+  .lock-card h1 { font-size: 24px; margin-bottom: 8px; }
+  .lock-card p { color: #a0aec0; font-size: 14px; margin-bottom: 20px; }
+  .lock-card input {
+    width: 100%; padding: 14px; border-radius: 10px; border: 1px solid #2d3748;
+    background: #0d1225; color: #e2e8f0; font-size: 15px; margin-bottom: 12px;
+  }
+  .lock-card button {
+    width: 100%; padding: 14px; border-radius: 10px; border: 0;
+    background: #4299e1; color: white; font-size: 15px; font-weight: 600;
+    cursor: pointer;
+  }
+  .lock-card .error { color: #f56565; font-size: 13px; margin-top: 12px; min-height: 16px; }
+
+  .header {
+    background: linear-gradient(135deg, #1a1f36 0%, #0d1225 100%);
+    border-bottom: 1px solid #2d3748;
+    padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top));
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header h1 { font-size: 17px; font-weight: 600; }
+  .header h1 span { color: #4299e1; }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    display: inline-block; margin-right: 6px;
+  }
+  .status-dot.live { background: #48bb78; animation: pulse 2s infinite; }
+  .status-dot.stale { background: #ecc94b; }
+  .status-dot.offline { background: #f56565; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .status-text { font-size: 11px; color: #a0aec0; }
+
+  .banner {
+    padding: 10px 16px; font-size: 13px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #2d3748;
+  }
+  .banner.open { background: linear-gradient(90deg, #22543d55, transparent); }
+  .banner.closed { background: linear-gradient(90deg, #55352555, transparent); }
+  .banner .label { font-weight: 600; letter-spacing: 0.3px; }
+  .banner .countdown {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 16px; font-weight: 700;
+  }
+  .banner.open .countdown { color: #48bb78; }
+  .banner.closed .countdown { color: #ecc94b; }
+
+  .cards {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    padding: 12px;
+  }
+  .card {
+    background: #1a1f36; border: 1px solid #2d3748;
+    border-radius: 12px; padding: 14px;
+  }
+  .card .label {
+    font-size: 10px; color: #718096;
+    text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .card .value { font-size: 22px; font-weight: 700; margin-top: 3px; }
+  .card .value.positive { color: #48bb78; }
+  .card .value.negative { color: #f56565; }
+  .card .sub { font-size: 11px; color: #718096; margin-top: 2px; }
+  .card.full-width { grid-column: 1 / -1; }
+
+  .section { padding: 0 12px 12px; }
+  .section-title {
+    font-size: 11px; color: #a0aec0;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    margin: 14px 4px 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .section-title .count {
+    background: #2d3748; color: #a0aec0;
+    font-size: 10px; padding: 2px 7px; border-radius: 10px;
+    font-weight: 600;
+  }
+
+  .list { background: #1a1f36; border-radius: 12px; border: 1px solid #2d3748; overflow: hidden; }
+  .list-item {
+    padding: 12px 14px; display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px; align-items: center;
+    border-top: 1px solid #2d3748;
+  }
+  .list-item:first-child { border-top: 0; }
+  .list-item .ticker { font-weight: 700; font-size: 14px; }
+  .list-item .ticker-meta { font-size: 11px; color: #718096; margin-top: 2px; }
+  .list-item .right { text-align: right; }
+  .list-item .pnl { font-weight: 600; font-size: 14px; }
+  .list-item .pnl.positive { color: #48bb78; }
+  .list-item .pnl.negative { color: #f56565; }
+  .list-item .pnl-pct { font-size: 11px; color: #718096; }
+
+  .badge {
+    display: inline-block; padding: 2px 7px;
+    border-radius: 4px; font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .badge.buy, .badge.bullish { background: #22543d; color: #48bb78; }
+  .badge.sell, .badge.bearish { background: #553525; color: #f56565; }
+  .badge.close { background: #2a4365; color: #4299e1; }
+
+  .empty {
+    text-align: center; padding: 32px;
+    color: #4a5568; font-size: 13px;
+  }
+
+  .refresh-btn {
+    position: fixed; bottom: max(16px, env(safe-area-inset-bottom));
+    right: 16px; width: 48px; height: 48px; border-radius: 24px;
+    background: #4299e1; color: white; border: 0; font-size: 20px;
+    cursor: pointer; z-index: 5;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .refresh-btn.spinning { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .api-bar {
+    padding: 8px 16px; font-size: 11px;
+    background: #0d1225; color: #718096;
+    display: flex; gap: 10px; align-items: center;
+    border-bottom: 1px solid #2d3748;
+  }
+  .api-bar .progress {
+    flex: 1; height: 5px; background: #2d3748;
+    border-radius: 3px; overflow: hidden;
+  }
+  .api-bar .fill {
+    height: 100%; background: #48bb78;
+    transition: width 0.4s;
+  }
+  .api-bar .fill.mid { background: #ecc94b; }
+  .api-bar .fill.high { background: #f56565; }
+</style>
+</head>
+<body class="locked">
+
+<div class="lock-card" id="lockCard">
+  <h1>🐋 Whale Tracker</h1>
+  <p>Enter access token</p>
+  <input type="password" id="tokenInput" placeholder="Access token" autocomplete="off">
+  <button onclick="submitToken()">Unlock</button>
+  <div class="error" id="lockError"></div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="header">
+    <h1><span>Whale</span> Tracker</h1>
+    <div>
+      <span class="status-dot live" id="statusDot"></span>
+      <span class="status-text" id="statusText">Loading…</span>
+    </div>
+  </div>
+
+  <div class="banner closed" id="marketBanner">
+    <div>
+      <span class="label" id="marketLabel">MARKET CLOSED</span>
+      <div style="font-size:10px;color:#718096" id="marketSub">Opens in:</div>
+    </div>
+    <div class="countdown" id="marketCountdown">--:--:--</div>
+  </div>
+
+  <div class="api-bar">
+    <span>UW API</span>
+    <div class="progress"><div class="fill" id="apiFill" style="width:0%"></div></div>
+    <span id="apiText">0</span>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="label">Equity</div>
+      <div class="value" id="equity">--</div>
+    </div>
+    <div class="card">
+      <div class="label">Total Return</div>
+      <div class="value" id="totalReturn">--</div>
+      <div class="sub" id="totalReturnPct"></div>
+    </div>
+    <div class="card">
+      <div class="label">Day P&L</div>
+      <div class="value" id="dailyPnl">--</div>
+      <div class="sub" id="dailyPct"></div>
+    </div>
+    <div class="card">
+      <div class="label">Positions</div>
+      <div class="value" id="posCount">--</div>
+      <div class="sub" id="posLimit"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      <span>Positions</span>
+      <span class="count" id="posListCount">0</span>
+    </div>
+    <div class="list" id="positionsList">
+      <div class="empty">No open positions</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      <span>Recent Trades</span>
+      <span class="count" id="tradesCount">0</span>
+    </div>
+    <div class="list" id="tradesList">
+      <div class="empty">No trades yet</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      <span>Recent Signals</span>
+      <span class="count" id="signalsCount">0</span>
+    </div>
+    <div class="list" id="signalsList">
+      <div class="empty">No signals yet</div>
+    </div>
+  </div>
+
+  <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">↻</button>
+</div>
+
+<script>
+// ---- Token Gate ----
+const TOKEN_HASH = "4ef799f61e00aa30da1e3aca2a112349798a192138ce6538442b30e6aac7440c";
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function checkToken(token) {
+  if (!token) return false;
+  const hash = await sha256(token);
+  return hash === TOKEN_HASH;
+}
+
+async function submitToken() {
+  const token = document.getElementById('tokenInput').value.trim();
+  const errorEl = document.getElementById('lockError');
+  errorEl.textContent = '';
+  if (await checkToken(token)) {
+    sessionStorage.setItem('whaleToken', token);
+    // Also put token in URL hash so iOS home-screen bookmarks stay unlocked
+    history.replaceState(null, '', '#' + token);
+    unlock();
+  } else {
+    errorEl.textContent = 'Invalid token';
+  }
+}
+
+function unlock() {
+  document.body.classList.remove('locked');
+  document.getElementById('lockCard').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  refresh();
+  setInterval(refresh, 15000);
+  setInterval(updateCountdown, 1000);
+}
+
+// Auto-unlock from URL fragment or stored token
+(async () => {
+  const urlToken = window.location.hash.replace('#', '').trim();
+  const storedToken = sessionStorage.getItem('whaleToken');
+  const queryToken = new URLSearchParams(window.location.search).get('k');
+  for (const t of [urlToken, storedToken, queryToken]) {
+    if (t && await checkToken(t)) {
+      if (queryToken) history.replaceState(null, '', '#' + queryToken);
+      unlock();
+      return;
+    }
+  }
+})();
+
+document.getElementById('tokenInput').addEventListener('keypress', e => {
+  if (e.key === 'Enter') submitToken();
+});
+
+// ---- Formatting Helpers ----
+const fmt$ = (n) => '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const fmtShort$ = (n) => {
+  n = Number(n);
+  const sign = n < 0 ? '-' : '';
+  n = Math.abs(n);
+  if (n >= 1e6) return sign + '$' + (n/1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return sign + '$' + (n/1e3).toFixed(1) + 'K';
+  return sign + '$' + n.toFixed(2);
+};
+
+// ---- Countdown ----
+let nextTarget = null;
+function updateCountdown() {
+  if (!nextTarget) return;
+  const now = new Date();
+  const target = new Date(nextTarget);
+  let diff = Math.max(0, target - now);
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor((diff % 86400000) / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  const el = document.getElementById('marketCountdown');
+  if (d > 0) el.textContent = d + 'd ' + pad(h) + ':' + pad(m) + ':' + pad(s);
+  else el.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+}
+
+// ---- Refresh ----
+async function manualRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  await refresh();
+  setTimeout(() => btn.classList.remove('spinning'), 500);
+}
+
+async function refresh() {
+  try {
+    // Cache-bust to ensure fresh data
+    const res = await fetch('data.json?t=' + Date.now());
+    if (!res.ok) throw new Error('fetch failed');
+    const d = await res.json();
+    render(d);
+  } catch (e) {
+    document.getElementById('statusDot').className = 'status-dot offline';
+    document.getElementById('statusText').textContent = 'Offline';
+  }
+}
+
+function render(d) {
+  // Status dot
+  const age = d.updated_at ? (Date.now() / 1000 - d.updated_at) : 999;
+  const dot = document.getElementById('statusDot');
+  const stat = document.getElementById('statusText');
+  if (age < 300) {
+    dot.className = 'status-dot live';
+    stat.textContent = 'Live · ' + Math.round(age) + 's ago';
+  } else if (age < 1800) {
+    dot.className = 'status-dot stale';
+    stat.textContent = 'Stale · ' + Math.round(age/60) + 'm ago';
+  } else {
+    dot.className = 'status-dot offline';
+    stat.textContent = 'Stale · ' + Math.round(age/3600) + 'h ago';
+  }
+
+  // Market banner
+  const banner = document.getElementById('marketBanner');
+  const label = document.getElementById('marketLabel');
+  const sub = document.getElementById('marketSub');
+  if (d.market_is_open) {
+    banner.className = 'banner open';
+    label.textContent = 'MARKET OPEN';
+    sub.textContent = 'Closes in:';
+    nextTarget = d.next_close;
+  } else {
+    banner.className = 'banner closed';
+    label.textContent = 'MARKET CLOSED';
+    sub.textContent = 'Opens in:';
+    nextTarget = d.next_open;
+  }
+  updateCountdown();
+
+  // API usage
+  const apiToday = d.api_calls_today || 0;
+  const pct = Math.min((apiToday / 15000) * 100, 100);
+  const fill = document.getElementById('apiFill');
+  fill.style.width = pct + '%';
+  fill.className = 'fill' + (pct >= 80 ? ' high' : pct >= 50 ? ' mid' : '');
+  document.getElementById('apiText').textContent = apiToday.toLocaleString() + ' / 15K';
+
+  // Cards
+  const equity = Number(d.equity);
+  const dayPnl = Number(d.day_pnl);
+  const totalReturn = equity - 100000;
+
+  document.getElementById('equity').textContent = fmtShort$(equity);
+
+  const tr = document.getElementById('totalReturn');
+  tr.textContent = (totalReturn >= 0 ? '+' : '') + fmtShort$(totalReturn);
+  tr.className = 'value ' + (totalReturn >= 0 ? 'positive' : 'negative');
+  document.getElementById('totalReturnPct').textContent = (totalReturn/100000*100).toFixed(2) + '%';
+
+  const dp = document.getElementById('dailyPnl');
+  dp.textContent = (dayPnl >= 0 ? '+' : '') + fmtShort$(dayPnl);
+  dp.className = 'value ' + (dayPnl >= 0 ? 'positive' : 'negative');
+  document.getElementById('dailyPct').textContent = (d.day_pct || '0') + '%';
+
+  const positions = d.positions || [];
+  document.getElementById('posCount').textContent = positions.length;
+  document.getElementById('posLimit').textContent = 'of ' + (d.max_positions || 12) + ' max';
+  document.getElementById('posListCount').textContent = positions.length;
+
+  // Positions list
+  const posList = document.getElementById('positionsList');
+  if (positions.length === 0) {
+    posList.innerHTML = '<div class="empty">No open positions</div>';
+  } else {
+    posList.innerHTML = positions
+      .sort((a, b) => Number(b.unrealized_pl) - Number(a.unrealized_pl))
+      .map(p => {
+        const pl = Number(p.unrealized_pl);
+        const plpc = Number(p.unrealized_plpc) * 100;
+        return `<div class="list-item">
+          <div>
+            <div class="ticker">${p.symbol}</div>
+            <div class="ticker-meta">${p.qty} @ ${fmt$(p.avg_entry_price)} → ${fmt$(p.current_price)}</div>
+          </div>
+          <div class="right">
+            <div class="pnl ${pl >= 0 ? 'positive' : 'negative'}">${pl >= 0 ? '+' : ''}${fmt$(pl)}</div>
+            <div class="pnl-pct">${plpc >= 0 ? '+' : ''}${plpc.toFixed(2)}%</div>
+          </div>
+        </div>`;
+      }).join('');
+  }
+
+  // Trades list
+  const trades = d.trades || [];
+  document.getElementById('tradesCount').textContent = trades.length;
+  const tradesList = document.getElementById('tradesList');
+  if (trades.length === 0) {
+    tradesList.innerHTML = '<div class="empty">No trades yet</div>';
+  } else {
+    tradesList.innerHTML = trades.slice(0, 10).map(t => {
+      const when = t.created_at ? new Date(t.created_at * 1000) : null;
+      const timeStr = when ? when.toLocaleString('en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+      return `<div class="list-item">
+        <div>
+          <div class="ticker">${t.ticker} <span class="badge ${t.side}">${t.side}</span></div>
+          <div class="ticker-meta">${t.qty} @ ${fmt$(t.entry_price)} · ${timeStr}</div>
+        </div>
+        <div class="right">
+          <div class="pnl-pct">SL ${fmt$(t.stop_loss)}</div>
+          <div class="pnl-pct">TP ${fmt$(t.take_profit)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Signals list
+  const signals = d.signals || [];
+  document.getElementById('signalsCount').textContent = signals.length;
+  const signalsList = document.getElementById('signalsList');
+  if (signals.length === 0) {
+    signalsList.innerHTML = '<div class="empty">No signals yet</div>';
+  } else {
+    signalsList.innerHTML = signals.slice(0, 10).map(s => {
+      const score = s.score || 0;
+      const scoreColor = score >= 0.7 ? '#48bb78' : score >= 0.5 ? '#ecc94b' : '#f56565';
+      return `<div class="list-item">
+        <div>
+          <div class="ticker">${s.ticker} <span class="badge ${s.direction}">${s.direction}</span></div>
+          <div class="ticker-meta">${s.source} · ${fmtShort$(s.size)}</div>
+        </div>
+        <div class="right">
+          <div class="pnl" style="color:${scoreColor}">${score.toFixed(2)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+</script>
+</body>
+</html>
